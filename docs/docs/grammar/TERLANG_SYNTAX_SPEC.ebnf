@@ -119,7 +119,7 @@ MethodDecl ::= [ "pub" ] Receiver MethodFunction .
 Receiver ::= "(" LowerIdent ":" ReceiverType ")" .
 ReceiverType ::= TypeName [ TypeArgs ] .
 MethodFunction
-  ::= LowerIdent [ TypeParams ] "(" [ ParamList ] ")" [ ConstraintList ] ":" TypeExpr "->" Expr
+  ::= LowerIdent [ TypeParams ] "(" [ ParamList ] ")" [ ConstraintList ] ":" TypeExpr "->" Expr .
 
 (*
 
