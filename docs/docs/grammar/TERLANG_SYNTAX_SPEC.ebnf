@@ -9,8 +9,7 @@ Program ::= { Declaration } .
 Declaration
   ::= ErlangAttributeDecl "."
    | ModuleDecl "." 
-   | ImportDecl "." 
-   | ExportDecl "."
+   | ImportDecl "."
    | TypeDecl "." 
    | OpaqueTypeDecl "."
    | StructDecl "."
@@ -55,26 +54,137 @@ ErlangGenericAttr ::= NameRef "(" RawText ")" .
 FunctionRef ::= LowerIdent "/" Int .
 TypeParamList ::= ErlangVariable { "," ErlangVariable } .
 
-ModuleDecl ::= "module" QualifiedId .
-ImportDecl ::= "import" ImportItem { "," ImportItem } .
-ExportDecl ::= "export" [ "type" ] ExportAtom { "," ExportAtom } .
+
+(* Terlang source uses declaration-site visibility.
+
+   A declaration is private to its module unless marked `pub`.
+
+   `pub` on a function exports the function by name and arity.
+   `pub` on a type exports the type name and type-parameter arity.
+   `pub` on an opaque type exports the type name and arity while hiding its representation.
+
+   Erlang-style `-export([...]).` attributes are accepted only by the Erlang
+   interop frontend and normalize to the same interface export metadata.
+*)
+
 TypeDecl ::= [ "pub" ] "type" TypeName [ TypeParams ] "=" TypeExpr .
+
+(* An opaque type declaration defines a nominal type whose representation is known
+   inside the defining module and hidden outside it.
+
+   Inside the defining module, the opaque type may be constructed from and coerced
+   to its representation type.
+
+   Outside the defining module, only the opaque type name and arity are visible.
+   External code may use values of the opaque type but may not construct,
+   deconstruct, or coerce them through the representation type unless public
+   functions expose that behavior.
+
+   A `pub opaque type` exports the opaque type name and arity, not its
+   representation.
+*)
 OpaqueTypeDecl ::= [ "pub" ] "opaque" "type" TypeName [ TypeParams ] "=" TypeExpr .
-StructDecl ::= "struct" TypeName StructBody .
+
+StructDecl ::= [ "pub" ] "struct" TypeName StructBody .
 ConstructorDecl ::= [ "pub" ] "constructor" TypeName [ TypeParams ] "{" ConstructorClause { ";" ConstructorClause } "}" .
+FunctionDecl ::= [ "pub" ] [ "macro" ] ( TypedFunction | ClauseFunction ) .
 TraitDecl ::= "trait" TypeName [ TypeParams ] [ "extends" TraitRef { "," TraitRef } ] "{" [ TraitMethodDecl { ";" TraitMethodDecl } [ ";" ] ] "}" .
-ProtocolDecl ::= "protocol" QualifiedId RawBlock .
+
+(*
+
+    Terlang module paths are lower-case dotted names.
+
+    A ModulePath consists only of LowerIdent segments separated by dots.
+
+    A type name is an UpperIdent. A qualified type reference is a ModulePath
+    followed by "." and a TypeName.
+
+    The grammar avoids case-flexible qualified names in Terlang source mode.
+    Case-flexible qualified identifiers may still be used by Erlang interop forms
+    if needed, but they are not the native Terlang module-path syntax.
+
+    ```
+    module app.web.page.
+    import std.list.
+
+    import std.option.{map, flat_map as bind, Maybe}.
+    import std.option.{Maybe}.
+    ```
+*)
+
+ModuleDecl ::= "module" ModulePath .
+
+ImportDecl ::= "import" ImportItem { "," ImportItem } .
+
+ImportItem
+  ::= ModuleImport
+   | AssetImport
+   | SelectiveImport
+   .
+
+ModuleImport ::= ModulePath [ "as" LowerIdent ] .
+SelectiveImport ::= ModulePath ".{" ImportSym { "," ImportSym } "}" .
+
+ImportSym
+  ::= LowerImportSym
+   | UpperImportSym
+   .
+
+(* Selective imports preserve identifier class.
+
+   A LowerImportSym imports a lower-case exported symbol, such as a function, value,
+   or macro. Its alias, if present, must also be lower-case.
+
+   An UpperImportSym imports an upper-case exported symbol, such as a type, struct,
+   trait, or constructor-like name. Its alias, if present, must also be upper-case.
+
+   The parser does not distinguish type names from constructor names during import
+   parsing. That distinction is resolved semantically after parsing.
+*)
+
+LowerImportSym ::= LowerIdent [ "as" LowerIdent ] .
+UpperImportSym ::= UpperIdent [ "as" UpperIdent ] .
+
+(*
+    Follows macro implementation for later parsing.
+    `
+      import css "page.css" as page_css.
+      import markdown "intro.md" as intro.
+      import json "schema.json" as schema.
+    `
+*)
+AssetImport ::= AssetKind StringLiteral "as" LowerIdent .
+AssetKind ::= LowerIdent .
+
+ProtocolDecl ::= "protocol" ModulePath RawBlock .
+
+ModulePath ::= LowerIdent { "." LowerIdent } .
+QualifiedValueRef ::= ModulePath "." LowerIdent .
+QualifiedTypeRef ::= ModulePath "." TypeName .
+
 ImplDecl ::= "impl" RawBlock .
 ServerDecl ::= "server" RawBlock .
 TemplateDecl ::= "template" TypeName "from" StringLiteral RawBlock .
-FunctionDecl ::= [ "pub" ] [ "macro" ] ( TypedFunction | ClauseFunction ) .
+
+
+(* Raw macro names are user-defined.
+
+   The parser accepts any non-reserved LowerIdent followed immediately by a RawBlock
+   as a RawMacroExpr.
+
+   The parser does not validate whether the raw macro name exists. Macro existence,
+   visibility, imports, expansion behavior, and raw-language parsing are resolved
+   after parsing.
+
+   If no macro named by RawMacroName is in scope, compilation fails during macro
+   resolution.
+*)
+
+RawMacroExpr ::= RawMacroName RawBlock .
+RawMacroName ::= LowerIdent .
 
 TypeName ::= UpperIdent .
-QualifiedId ::= NameRef { "." NameRef } .
-ExportAtom ::= LowerIdent "/" Int .
 TypeParams ::= "[" TypeVar { "," TypeVar } "]" .
-ImportItem ::= QualifiedId | "type" QualifiedId | ("file" | "css" | "markdown") StringLiteral "as" NameRef | QualifiedId ".{" ImportSym { "," ImportSym } "}" .
-ImportSym ::= NameRef [ "as" NameRef ] .
 
 StructBody ::= "{" [ StructField { "," StructField } ] "}" .
 StructField ::= LowerIdent ":" TypeExpr [ "=" Expr ] .
@@ -95,7 +205,7 @@ TypeArrow ::= TypePrimary | "(" [ TypeExprList ] ")" "->" TypeExpr .
 TypeExprList ::= TypeExpr { "," TypeExpr } .
 TypePrimary ::= TypeRef [ TypeArgs ] | TypeTuple | TypeList | TypeMap | TypeLiteral | "(" TypeExpr ")" .
 TypeArgs ::= "[" TypeExprList "]" | "(" [ TypeExprList ] ")" .
-ModulePath ::= LowerIdent { "." LowerIdent } .
+
 TypeRef ::= [ ModulePath "." ] TypeName .
 TypeTuple ::= "{" [ TypeTupleElem { "," TypeTupleElem } ] "}" .
 TypeTupleElem
@@ -113,11 +223,11 @@ Constraint ::= TypeName [ "(" [ TypeExprList ] ")" ] .
 
 Expr ::= SendExpr .
 
-CaseExpr ::= "case" Expr "of" Clause (";" Clause)* "end" .
+CaseExpr ::= "case" Expr "of" Clause { ";" Clause } "end" .
 Clause ::= PatternList [ "when" Expr ] "->" Expr .
 FunExpr ::= "fun" "(" [ PatternList ] ")" "->" Expr "end" .
-ReceiveExpr ::= "receive" Clause (";" Clause)* "end" .
-TryExpr ::= "try" Expr [ "of" Clause (";" Clause)* ] [ "catch" CatchClause { ";" CatchClause } ] [ "after" Expr "->" Expr ] "end" .
+ReceiveExpr ::= "receive" Clause { ";" Clause } "end" .
+TryExpr ::= "try" Expr [ "of" Clause { ";" Clause } ] [ "catch" CatchClause { ";" CatchClause } ] [ "after" Expr "->" Expr ] "end" .
 IfExpr ::= "if" IfClause { ";" IfClause } "end" .
 CatchClause ::= PatternList [ "when" Expr ] "->" Expr .
 IfClause ::= Expr "->" Expr .
@@ -159,7 +269,8 @@ PrimaryExpr
    | UnquoteExpr
    | "(" Expr ")"
    | RemoteCallExpr
-   | RemoteFunRef .
+   | RemoteFunRef
+   | RawMacroExpr .
 
 TupleExpr ::= "{" [ Expr { "," Expr } ] "}" .
 ListExpr ::= "[" [ Expr { "," Expr } ] "]" .
@@ -175,8 +286,8 @@ FieldSuffix ::= "#" TypeName "." LowerIdent | "#" TypeName "{" [ LowerIdent "=" 
 ErlangRecordExpr ::= "#" TypeName "{" [ LowerIdent "=" Expr { "," LowerIdent "=" Expr } ] "}" .
 MacroExpr ::= "?" NameRef [ "(" [ Expr { "," Expr } ] ")" ] .
 
-Pattern ::= ConsPattern .
-ConsPattern ::= PrimaryPattern [ "|" ConsPattern ] .
+Pattern ::= PrimaryPattern .
+ListPattern ::= "[" [ Pattern { "," Pattern } [ "|" Pattern ] ] "]" .
 PrimaryPattern
   ::= "_"
    | Binding
@@ -192,7 +303,6 @@ PrimaryPattern
    .
 TuplePattern ::= "{" [ Pattern { "," Pattern } ] "}" .
 ConstructorPattern ::= ConstructorAtom [ "(" PatternList1 ")" ] .
-ListPattern ::= "[" [ Pattern { "," Pattern } ] "]" .
 MapPattern ::= "#{" [ PatternMapField { "," PatternMapField } ] "}" .
 PatternMapField ::= Expr ( "=>" | ":=" ) Pattern .
 RecordPattern ::= "#" TypeName "{" [ LowerIdent "=" Pattern { "," LowerIdent "=" Pattern } ] "}" .
@@ -200,30 +310,90 @@ RecordPattern ::= "#" TypeName "{" [ LowerIdent "=" Pattern { "," LowerIdent "="
 BinarySegment ::= Expr [ ":" Expr ] [ "/" BinarySegmentType { "-" BinarySegmentType } ] .
 BinarySegmentType ::= "integer" | "float" | "binary" | "bytes" | "bitstring" | "bits" | "utf8" | "utf16" | "utf32" | "signed" | "unsigned" | "big" | "little" | "native" .
 
-RawBlock ::= "{" RawText "}" .
-RawText ::= "..." .
+RawBlock ::= BalancedRawBlock .
+BalancedRawBlock ::= "{" RawText "}" .
+RawText ::= ? opaque source text whose unescaped braces are balanced ? .
 
-Token_Literals
-  ::= "module" | "import" | "export" | "type" | "opaque" | "struct" | "constructor" | "trait" | "extends" | "protocol" | "impl" | "server" | "template" | "pub" | "macro" | "case" | "of" | "fun" | "receive" | "if" | "try" | "catch" | "after" | "when" | "quote" | "unquote" | "end" .
+(* Lexical reserved words.
+   A LowerIdent token MUST NOT have the same source spelling as any ReservedWord.
+   Reserved words are matched before identifiers.
+*)
+ReservedWord
+  ::= "module"
+   | "import"
+   | "export"
+   | "type"
+   | "opaque"
+   | "struct"
+   | "constructor"
+   | "trait"
+   | "extends"
+   | "protocol"
+   | "impl"
+   | "server"
+   | "template"
+   | "from"
+   | "pub"
+   | "macro"
+   | "case"
+   | "of"
+   | "fun"
+   | "receive"
+   | "if"
+   | "try"
+   | "catch"
+   | "after"
+   | "when"
+   | "quote"
+   | "unquote"
+   | "end"
+   | "as"
+   | "not"
+   | "div"
+   | "rem"
+
+   (* Erlang interop attribute words. *)
+   | "record"
+   | "spec"
+   | "define"
+   | "include"
+   | "include_lib"
+   .
+
+(* A source character sequence matching LowerIdent is emitted as LowerIdent only
+   if it is not exactly equal to any ReservedWord. Otherwise it is emitted as the
+   corresponding reserved token.
+
+   A source character sequence matching UpperIdent is emitted as UpperIdent.
+   There are no reserved uppercase words.
+*)
 
 NameRef ::= LowerIdent | UpperIdent .
+Identifier ::= LowerIdent | UpperIdent .
+
+(* LowerIdent excludes ReservedWord by lexer policy. *)
+LowerIdent ::= LowerLetter { IdentContinue } .
+UpperIdent ::= UpperLetter { IdentContinue } .
+
 AtomName ::= LowerIdent .
 ConstructorAtom ::= UpperIdent .
+
+(* Bare raw atoms use non-reserved lowercase atom names, such as :none and :empty.
+   Reserved-word atoms must be quoted, such as :'type' or :'case'.
+*)
 RawAtom ::= ":" AtomName | ":" QuotedAtom .
 QuotedAtom ::= "'" { QuotedAtomChar } "'" .
+
 Binding ::= LowerIdent | "_" LowerIdent .
 ExprList ::= Expr { "," Expr } .
 CallExpr ::= NameRef "(" [ ExprList ] ")" .
 ErlangVariable ::= UpperIdent | "_" LowerIdent | "_" UpperIdent | "_" .
-Identifier ::= LowerIdent | UpperIdent .
-LowerIdent ::= [a-z][a-zA-Z0-9_]* .
-UpperIdent ::= [A-Z][A-Za-z0-9_]* .
 Int ::= DecimalInt | BinaryInt | HexInt | OctalInt .
 DecimalInt ::= Digit { Digit } .
 BinaryInt ::= "0b" BinaryDigit { BinaryDigit } .
 HexInt ::= "0x" HexDigit { HexDigit } .
 OctalInt ::= "0o" OctalDigit { OctalDigit } .
-Float ::= Digit+ "." Digit+ .
+Float ::= Digit { Digit } "." Digit { Digit } .
 StringLiteral ::= "\"" { StringChar } "\"" .
 QuotedAtomChar ::= ? any source character except unescaped "'" ? .
 Binary ::= "<<" [ BinarySegment { "," BinarySegment } ] ">>" .
@@ -232,6 +402,9 @@ BinaryDigit ::= "0" | "1" .
 OctalDigit ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" .
 HexDigit ::= Digit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F" .
 Digit ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" .
+LowerLetter ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" .
+UpperLetter ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" .
+IdentContinue ::= LowerLetter | UpperLetter | Digit | "_" .
 StringChar ::= ? any source character except unescaped terminator ? .
 
 (* Informal conventions
