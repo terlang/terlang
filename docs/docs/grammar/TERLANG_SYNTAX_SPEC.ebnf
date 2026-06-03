@@ -1,0 +1,272 @@
+(* Terlang syntax specification (EBNF)
+   Canonical version: v0.1
+*)
+
+SyntaxSpec ::= Program .
+
+Program ::= { Declaration } .
+
+Declaration
+  ::= ErlangAttributeDecl "."
+   | ModuleDecl "." 
+   | ImportDecl "." 
+   | ExportDecl "."
+   | TypeDecl "." 
+   | OpaqueTypeDecl "."
+   | StructDecl "."
+   | ConstructorDecl "."
+   | TraitDecl "."
+   | ProtocolDecl "."
+   | ImplDecl "."
+   | ServerDecl "."
+   | TemplateDecl "."
+   | FunctionDecl "."
+   .
+
+(* Erlang interop attributes.
+   These belong to the Erlang interop frontend, not necessarily Terlang source
+   mode. They are listed here as the shared normalization target for hard
+   interface/runtime interop.
+*)
+ErlangAttributeDecl ::= "-" ErlangAttribute .
+ErlangAttribute
+  ::= ErlangModuleAttr
+   | ErlangExportAttr
+   | ErlangImportAttr
+   | ErlangRecordAttr
+   | ErlangSpecAttr
+   | ErlangTypeAttr
+   | ErlangOpaqueTypeAttr
+   | ErlangDefineAttr
+   | ErlangIncludeAttr
+   | ErlangGenericAttr
+   .
+ErlangModuleAttr ::= "module" "(" NameRef ")" .
+ErlangExportAttr ::= "export" "(" "[" FunctionRef { "," FunctionRef } "]" ")" .
+ErlangImportAttr ::= "import" "(" NameRef "," "[" FunctionRef { "," FunctionRef } "]" ")" .
+ErlangRecordAttr ::= "record" "(" NameRef "," "{" [ ErlangRecordField { "," ErlangRecordField } ] "}" ")" .
+ErlangRecordField ::= NameRef [ "=" Expr ] .
+ErlangSpecAttr ::= "spec" NameRef "(" [ TypeExprList ] ")" "->" TypeExpr .
+ErlangTypeAttr ::= "type" NameRef "(" [ TypeParamList ] ")" "::" TypeExpr .
+ErlangOpaqueTypeAttr ::= "opaque" NameRef "(" [ TypeParamList ] ")" "::" TypeExpr .
+ErlangDefineAttr ::= "define" "(" RawText ")" .
+ErlangIncludeAttr ::= ( "include" | "include_lib" ) "(" StringLiteral ")" .
+ErlangGenericAttr ::= NameRef "(" RawText ")" .
+FunctionRef ::= LowerIdent "/" Int .
+TypeParamList ::= ErlangVariable { "," ErlangVariable } .
+
+ModuleDecl ::= "module" QualifiedId .
+ImportDecl ::= "import" ImportItem { "," ImportItem } .
+ExportDecl ::= "export" [ "type" ] ExportAtom { "," ExportAtom } .
+TypeDecl ::= [ "pub" ] "type" TypeName [ TypeParams ] "=" TypeExpr .
+OpaqueTypeDecl ::= [ "pub" ] "opaque" "type" TypeName [ TypeParams ] "=" TypeExpr .
+StructDecl ::= "struct" TypeName StructBody .
+ConstructorDecl ::= [ "pub" ] "constructor" TypeName [ TypeParams ] "{" ConstructorClause { ";" ConstructorClause } "}" .
+TraitDecl ::= "trait" TypeName [ TypeParams ] [ "extends" TraitRef { "," TraitRef } ] "{" [ TraitMethodDecl { ";" TraitMethodDecl } [ ";" ] ] "}" .
+ProtocolDecl ::= "protocol" QualifiedId RawBlock .
+ImplDecl ::= "impl" RawBlock .
+ServerDecl ::= "server" RawBlock .
+TemplateDecl ::= "template" TypeName "from" StringLiteral RawBlock .
+FunctionDecl ::= [ "pub" ] [ "macro" ] ( TypedFunction | ClauseFunction ) .
+
+TypeName ::= UpperIdent .
+QualifiedId ::= NameRef { "." NameRef } .
+ExportAtom ::= LowerIdent "/" Int .
+TypeParams ::= "[" TypeVar { "," TypeVar } "]" .
+ImportItem ::= QualifiedId | "type" QualifiedId | ("file" | "css" | "markdown") StringLiteral "as" NameRef | QualifiedId ".{" ImportSym { "," ImportSym } "}" .
+ImportSym ::= NameRef [ "as" NameRef ] .
+
+StructBody ::= "{" [ StructField { "," StructField } ] "}" .
+StructField ::= LowerIdent ":" TypeExpr [ "=" Expr ] .
+ConstructorClause ::= "(" [ ParamList ] ")" ":" TypeExpr "->" Expr .
+ParamList ::= Param { "," Param } .
+Param ::= LowerIdent ":" TypeExpr [ "=" Expr ] | "..." LowerIdent ":" TypeExpr .
+TypedFunction ::= LowerIdent [ TypeParams ] "(" [ ParamList ] ")" [ ConstraintList ] ":" TypeExpr "->" Expr .
+ClauseFunction ::= LowerIdent [ TypeParams ] "(" [ PatternList ] ")" [ "when" Expr ] "->" Expr { ";" LowerIdent "(" [ PatternList ] ")" [ "when" Expr ] "->" Expr } .
+PatternList ::= Pattern { "," Pattern } .
+PatternList1 ::= Pattern { "," Pattern } .
+TraitMethodDecl ::= LowerIdent "(" [ ParamList ] ")" ":" TypeExpr .
+TraitRef ::= TypeName [ TypeParams ] .
+TypeVar ::= UpperIdent .
+
+TypeExpr ::= TypeUnion .
+TypeUnion ::= TypeArrow { "|" TypeArrow } .
+TypeArrow ::= TypePrimary | "(" [ TypeExprList ] ")" "->" TypeExpr .
+TypeExprList ::= TypeExpr { "," TypeExpr } .
+TypePrimary ::= TypeRef [ TypeArgs ] | TypeTuple | TypeList | TypeMap | TypeLiteral | "(" TypeExpr ")" .
+TypeArgs ::= "[" TypeExprList "]" | "(" [ TypeExprList ] ")" .
+ModulePath ::= LowerIdent { "." LowerIdent } .
+TypeRef ::= [ ModulePath "." ] TypeName .
+TypeTuple ::= "{" [ TypeTupleElem { "," TypeTupleElem } ] "}" .
+TypeTupleElem
+  ::= TypeExpr
+   | LowerIdent ":" TypeExpr
+   | "_" ":" TypeExpr
+   .
+TypeList ::= "[" TypeExpr "]" .
+TypeMap ::= "#{" [ TypeMapField { "," TypeMapField } ] "}" .
+TypeMapField ::= LowerIdent ( ":=" | "=>" ) TypeExpr .
+TypeLiteral ::= AtomLiteral | Int | Float | StringLiteral .
+AtomLiteral ::= RawAtom | QuotedAtom .
+ConstraintList ::= "[" Constraint { "," Constraint } "]" .
+Constraint ::= TypeName [ "(" [ TypeExprList ] ")" ] .
+
+Expr ::= SendExpr .
+
+CaseExpr ::= "case" Expr "of" Clause (";" Clause)* "end" .
+Clause ::= PatternList [ "when" Expr ] "->" Expr .
+FunExpr ::= "fun" "(" [ PatternList ] ")" "->" Expr "end" .
+ReceiveExpr ::= "receive" Clause (";" Clause)* "end" .
+TryExpr ::= "try" Expr [ "of" Clause (";" Clause)* ] [ "catch" CatchClause { ";" CatchClause } ] [ "after" Expr "->" Expr ] "end" .
+IfExpr ::= "if" IfClause { ";" IfClause } "end" .
+CatchClause ::= PatternList [ "when" Expr ] "->" Expr .
+IfClause ::= Expr "->" Expr .
+QuoteExpr ::= "quote" Expr .
+UnquoteExpr ::= "unquote" "(" Expr ")" .
+SendExpr ::= PipeExpr { "!" PipeExpr } .
+PipeExpr ::= CmpExpr { "|>" CmpExpr } .
+CmpExpr ::= AddExpr { CmpOp AddExpr } .
+AddExpr ::= MulExpr { AddOp MulExpr } .
+MulExpr ::= UnaryExpr { MulOp UnaryExpr } .
+UnaryExpr ::= UnaryOp UnaryExpr | PostfixExpr .
+UnaryOp ::= "-" | "not" | "!" .
+AddOp ::= "+" | "-" .
+MulOp ::= "*" | "/" | "div" | "rem" .
+CmpOp ::= "==" | "=:=" | "/=" | "=/=" | ">=" | ">" | "<=" | "<" | ">=>" .
+PostfixExpr ::= PrimaryExpr { FieldSuffix } .
+PrimaryExpr
+  ::= AtomLiteral
+   | CallExpr
+   | Binding
+   | Int
+   | Float
+   | StringLiteral
+   | Binary
+   | TupleExpr
+   | ListExpr
+   | ConsListExpr
+   | MapExpr
+   | RecordExpr
+   | ErlangRecordExpr
+   | MacroExpr
+   | CaseExpr
+   | ListGeneratorExpr
+   | FunExpr
+   | ReceiveExpr
+   | TryExpr
+   | IfExpr
+   | QuoteExpr
+   | UnquoteExpr
+   | "(" Expr ")"
+   | RemoteCallExpr
+   | RemoteFunRef .
+
+TupleExpr ::= "{" [ Expr { "," Expr } ] "}" .
+ListExpr ::= "[" [ Expr { "," Expr } ] "]" .
+ConsListExpr ::= "[" Expr "|" Expr "]" .
+ListGeneratorExpr ::= "[" Expr "|" Generator { "," Generator } "]" .
+Generator ::= Pattern "<-" Expr .
+MapExpr ::= "#{" [ MapField { "," MapField } ] "}" .
+MapField ::= Expr ( "=>" | ":=" ) Expr .
+RecordExpr ::= TypeName "{" [ LowerIdent "=" Expr { "," LowerIdent "=" Expr } ] "}" .
+RemoteCallExpr ::= NameRef ":" LowerIdent "(" [ Expr { "," Expr } ] ")" .
+RemoteFunRef ::= "fun" NameRef ":" LowerIdent "/" Int .
+FieldSuffix ::= "#" TypeName "." LowerIdent | "#" TypeName "{" [ LowerIdent "=" Expr { "," LowerIdent "=" Expr } ] "}" .
+ErlangRecordExpr ::= "#" TypeName "{" [ LowerIdent "=" Expr { "," LowerIdent "=" Expr } ] "}" .
+MacroExpr ::= "?" NameRef [ "(" [ Expr { "," Expr } ] ")" ] .
+
+Pattern ::= ConsPattern .
+ConsPattern ::= PrimaryPattern [ "|" ConsPattern ] .
+PrimaryPattern
+  ::= "_"
+   | Binding
+   | ConstructorPattern
+   | AtomLiteral
+   | Int
+   | Float
+   | StringLiteral
+   | TuplePattern
+   | ListPattern
+   | MapPattern
+   | RecordPattern
+   .
+TuplePattern ::= "{" [ Pattern { "," Pattern } ] "}" .
+ConstructorPattern ::= ConstructorAtom [ "(" PatternList1 ")" ] .
+ListPattern ::= "[" [ Pattern { "," Pattern } ] "]" .
+MapPattern ::= "#{" [ PatternMapField { "," PatternMapField } ] "}" .
+PatternMapField ::= Expr ( "=>" | ":=" ) Pattern .
+RecordPattern ::= "#" TypeName "{" [ LowerIdent "=" Pattern { "," LowerIdent "=" Pattern } ] "}" .
+
+BinarySegment ::= Expr [ ":" Expr ] [ "/" BinarySegmentType { "-" BinarySegmentType } ] .
+BinarySegmentType ::= "integer" | "float" | "binary" | "bytes" | "bitstring" | "bits" | "utf8" | "utf16" | "utf32" | "signed" | "unsigned" | "big" | "little" | "native" .
+
+RawBlock ::= "{" RawText "}" .
+RawText ::= "..." .
+
+Token_Literals
+  ::= "module" | "import" | "export" | "type" | "opaque" | "struct" | "constructor" | "trait" | "extends" | "protocol" | "impl" | "server" | "template" | "pub" | "macro" | "case" | "of" | "fun" | "receive" | "if" | "try" | "catch" | "after" | "when" | "quote" | "unquote" | "end" .
+
+NameRef ::= LowerIdent | UpperIdent .
+AtomName ::= LowerIdent .
+ConstructorAtom ::= UpperIdent .
+RawAtom ::= ":" AtomName | ":" QuotedAtom .
+QuotedAtom ::= "'" { QuotedAtomChar } "'" .
+Binding ::= LowerIdent | "_" LowerIdent .
+ExprList ::= Expr { "," Expr } .
+CallExpr ::= NameRef "(" [ ExprList ] ")" .
+ErlangVariable ::= UpperIdent | "_" LowerIdent | "_" UpperIdent | "_" .
+Identifier ::= LowerIdent | UpperIdent .
+LowerIdent ::= [a-z][a-zA-Z0-9_]* .
+UpperIdent ::= [A-Z][A-Za-z0-9_]* .
+Int ::= DecimalInt | BinaryInt | HexInt | OctalInt .
+DecimalInt ::= Digit { Digit } .
+BinaryInt ::= "0b" BinaryDigit { BinaryDigit } .
+HexInt ::= "0x" HexDigit { HexDigit } .
+OctalInt ::= "0o" OctalDigit { OctalDigit } .
+Float ::= Digit+ "." Digit+ .
+StringLiteral ::= "\"" { StringChar } "\"" .
+QuotedAtomChar ::= ? any source character except unescaped "'" ? .
+Binary ::= "<<" [ BinarySegment { "," BinarySegment } ] ">>" .
+
+BinaryDigit ::= "0" | "1" .
+OctalDigit ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" .
+HexDigit ::= Digit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F" .
+Digit ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" .
+StringChar ::= ? any source character except unescaped terminator ? .
+
+(* Informal conventions
+   - [] = optional, {} = repetition zero-or-more, () = grouping, | = alternation.
+   - RawText is opaque in first pass and must be preserved with span text on both ANTLR and LALRPOP outputs.
+   - Raw forms for protocol/impl/server/template are explicit declarations with their
+     own dedicated productions.
+   - Keyword-opened expressions use `end` as their closing token: `case`, `fun`, `receive`, `try`, and `if`.
+   - Top-level declarations are terminated by `.`; block declarations include
+     `{ ... }` before the terminating dot.
+   - Source identifiers use two explicit roles:
+     `NameRef` for syntactic name positions and `ConstructorAtom` (`UpperIdent`) for
+     constructor-pattern heads. Terlang does not treat bare identifiers as atoms.
+   - Call expressions are written `Name(...)` and resolved semantically as either
+     function calls or constructor calls depending on declaration context.
+   - v0 does not provide general expression-call postfix syntax such as `f.(10)`.
+     Anonymous function values are first-class; invocation of non-name values is not
+     part of the grammar.
+   - Reserved for a future version:
+     `FunctorCallExpr ::= Expr "." "(" [ ExprList ] ")" .` is intentionally not in
+     v0.
+   - Hard Erlang interop is required, but Terlang source syntax and Erlang
+     interop syntax are separate frontends.
+   - Erlang interop forms normalize into shared interface/runtime artifacts.
+     They are not required to be accepted unchanged in Terlang source mode.
+   - Raw atom patterns are always allowed and literal-match at runtime:
+     `:none`, `:empty`, etc. are pattern literals.
+   - Upper-case patterns are constructor-pattern syntax: `None` or `None(...)`.
+     This syntax is only valid when `None` is a declared constructor-like
+     pattern shape, such as an explicit constructor declaration or a
+     single-shape eligible type alias.
+     `None()` is not a valid constructor pattern unless the constructor shape
+     explicitly requires one-or-more fields.
+     Union-style aliases do not imply constructor-pattern syntax in v0.
+   - Erlang variable naming is a backend/interoperability constraint. Terlang
+     source value bindings remain lower-case; the Erlang backend rewrites
+     bindings into valid Erlang variables hygienically.
+*)
