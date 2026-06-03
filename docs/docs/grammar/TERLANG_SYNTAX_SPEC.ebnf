@@ -20,6 +20,7 @@ Declaration
    | ServerDecl "."
    | TemplateDecl "."
    | FunctionDecl "."
+   | MethodDecl "."
    .
 
 (* Erlang interop attributes.
@@ -85,10 +86,40 @@ TypeDecl ::= [ "pub" ] "type" TypeName [ TypeParams ] "=" TypeExpr .
 *)
 OpaqueTypeDecl ::= [ "pub" ] "opaque" "type" TypeName [ TypeParams ] "=" TypeExpr .
 
-StructDecl ::= [ "pub" ] "struct" TypeName StructBody .
+
+(* Struct derivation is compile-time expansion, not true inheritance.
+   Derivation copies fields from parent structs.
+   Derivation copies eligible receiver functions.
+   Derivation does not create subtyping, runtime parent objects, implicit coercions, virtual dispatch, or true inheritance.
+   Field conflicts are errors.
+   Method conflicts are errors unless an override rule is later introduced.
+  `
+    pub struct User {
+      id: UserId,
+      name: String
+    }.
+
+    pub struct Admin derives User {
+      role: String
+    }.
+  `
+
+*)
+StructDecl ::= [ "pub" ] "struct" TypeName [ StructDerives ] StructBody .
+StructDerives ::= "derives" TypeRef { "," TypeRef } .
+
 ConstructorDecl ::= [ "pub" ] "constructor" TypeName [ TypeParams ] "{" ConstructorClause { ";" ConstructorClause } "}" .
 FunctionDecl ::= [ "pub" ] [ "macro" ] ( TypedFunction | ClauseFunction ) .
 TraitDecl ::= "trait" TypeName [ TypeParams ] [ "extends" TraitRef { "," TraitRef } ] "{" [ TraitMethodDecl { ";" TraitMethodDecl } [ ";" ] ] "}" .
+
+(* A method may only be declared in the module that defines its receiver type.
+   Method identity is keyed by receiver type + method name + method arity.
+*)
+MethodDecl ::= [ "pub" ] Receiver MethodFunction .
+Receiver ::= "(" LowerIdent ":" ReceiverType ")" .
+ReceiverType ::= TypeName [ TypeArgs ] .
+MethodFunction
+  ::= LowerIdent [ TypeParams ] "(" [ ParamList ] ")" [ ConstraintList ] ":" TypeExpr "->" Expr
 
 (*
 
@@ -270,7 +301,8 @@ PrimaryExpr
    | "(" Expr ")"
    | RemoteCallExpr
    | RemoteFunRef
-   | RawMacroExpr .
+   | RawMacroExpr 
+   | ConstructorChainExpr .
 
 TupleExpr ::= "{" [ Expr { "," Expr } ] "}" .
 ListExpr ::= "[" [ Expr { "," Expr } ] "]" .
@@ -351,6 +383,8 @@ ReservedWord
    | "not"
    | "div"
    | "rem"
+   | "then"
+   | "derives"
 
    (* Erlang interop attribute words. *)
    | "record"
@@ -387,6 +421,23 @@ QuotedAtom ::= "'" { QuotedAtomChar } "'" .
 Binding ::= LowerIdent | "_" LowerIdent .
 ExprList ::= Expr { "," Expr } .
 CallExpr ::= NameRef "(" [ ExprList ] ")" .
+
+(* A constructor chain expression may appear in a constructor body for a derived struct.
+   The left side must resolve to a constructor call for a direct parent in the derives clause.
+   The right side must be a record expression for the child struct.
+   All required child-local fields must be initialized unless they have defaults.
+   Constructor chaining does not create runtime inheritance or subtyping.
+  `
+    pub constructor Admin {
+      (id: UserId, name: String, role: String): Admin ->
+        User(id, name) then Admin {
+          role = role
+        }
+    }.
+}.
+  `
+*)
+ConstructorChainExpr ::= CallExpr "then" RecordExpr .
 ErlangVariable ::= UpperIdent | "_" LowerIdent | "_" UpperIdent | "_" .
 Int ::= DecimalInt | BinaryInt | HexInt | OctalInt .
 DecimalInt ::= Digit { Digit } .
