@@ -483,7 +483,7 @@ ReservedWord
    | "not"
    | "div"
    | "rem"
-   | "then"
+   | "with"
    | "derives"
    | "true"
    | "false"
@@ -532,14 +532,14 @@ CallExpr ::= NameRef "(" [ ExprList ] ")" .
   `
     pub constructor Admin {
       (id: UserId, name: String, role: String): Admin ->
-        User(id, name) then Admin {
+        User(id, name) with Admin {
           role = role
         }
     }.
 }.
   `
 *)
-ConstructorChainExpr ::= CallExpr "then" RecordExpr .
+ConstructorChainExpr ::= CallExpr "with" RecordExpr .
 ErlangVariable ::= UpperIdent | "_" LowerIdent | "_" UpperIdent | "_" .
 Int ::= DecimalInt | BinaryInt | HexInt | OctalInt .
 DecimalInt ::= Digit { Digit } .
