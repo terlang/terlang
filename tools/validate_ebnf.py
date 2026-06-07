@@ -24,7 +24,7 @@ import sys
 from typing import Iterable
 
 
-DEFAULT_PATH = pathlib.Path("docs/docs/grammar/TERLANG_SYNTAX_SPEC.ebnf")
+DEFAULT_PATH = pathlib.Path("docs/grammar/TERLANG_SYNTAX_SPEC.ebnf")
 
 # Lower-case terminals/keywords that are expected to appear in the grammar text
 # but are not nonterminal references.
@@ -374,4 +374,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
