@@ -151,12 +151,21 @@ MethodFunction
     A type name is an UpperIdent. A qualified type reference is a ModulePath
     followed by "." and a TypeName.
 
+    A module may also expose a primary type whose name matches the final module
+    segment, similar to a typed default export. For example, `module
+    app.user.User.` may declare `pub type User = ...`. In type position,
+    semantic resolution may allow `app.user.User` to refer to that primary type
+    without spelling `app.user.User.User`. This is not parser behavior: the
+    grammar preserves the path, and the resolver decides whether a primary type
+    exists and is visible.
+
     The Erlang backend lowers `std.Core.Bool` to the Erlang-safe module atom
     `std_core_bool`; that mapping is a target artifact decision, not source
     syntax.
 
     ```
     module app.Web.Page.
+    module app.user.User.
     import std.Collections.List.
 
     import std.Core.Option.{map, flat_map as bind, Maybe}.
