@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static validator for Terlang EBNF specs.
+"""Static validator for Terlan EBNF specs.
 
 The validator is intentionally lightweight:
 - checks that all referenced nonterminals are defined
@@ -24,7 +24,7 @@ import sys
 from typing import Iterable
 
 
-DEFAULT_PATH = pathlib.Path("docs/grammar/TERLANG_SYNTAX_SPEC.ebnf")
+DEFAULT_PATH = pathlib.Path("docs/grammar/TERLAN_SYNTAX_SPEC.ebnf")
 
 # Lower-case terminals/keywords that are expected to appear in the grammar text
 # but are not nonterminal references.

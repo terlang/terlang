@@ -1,4 +1,4 @@
-(* Terlang syntax specification (EBNF)
+(* Terlan syntax specification (EBNF)
    Canonical version: v0.1
 *)
 
@@ -41,7 +41,7 @@ AnnotationQualifiedName ::= NameRef { "." NameRef } .
 AnnotationArgs ::= ConfigMacroBlock .
 
 (* Erlang interop attributes.
-   These belong to the Erlang interop frontend, not necessarily Terlang source
+   These belong to the Erlang interop frontend, not necessarily Terlan source
    mode. They are listed here as the shared normalization target for hard
    interface/runtime interop.
 *)
@@ -73,7 +73,7 @@ FunctionRef ::= LowerIdent "/" Int .
 TypeParamList ::= ErlangVariable { "," ErlangVariable } .
 
 
-(* Terlang source uses declaration-site visibility.
+(* Terlan source uses declaration-site visibility.
 
    A declaration is private to its module unless marked `pub`.
 
@@ -141,23 +141,26 @@ MethodFunction
 
 (*
 
-    Terlang module paths are lower-case dotted names.
+    Terlan module paths are package-rooted dotted names.
 
-    A ModulePath consists only of LowerIdent segments separated by dots.
+    A ModulePath begins with a lower-case package segment and may continue with
+    lower-case package segments or upper-case public module namespace segments.
+    This supports source paths such as `std.Core.Bool` while keeping package
+    roots lower-case.
 
     A type name is an UpperIdent. A qualified type reference is a ModulePath
     followed by "." and a TypeName.
 
-    The grammar avoids case-flexible qualified names in Terlang source mode.
-    Case-flexible qualified identifiers may still be used by Erlang interop forms
-    if needed, but they are not the native Terlang module-path syntax.
+    The Erlang backend lowers `std.Core.Bool` to the Erlang-safe module atom
+    `std_core_bool`; that mapping is a target artifact decision, not source
+    syntax.
 
     ```
-    module app.web.page.
-    import std.list.
+    module app.Web.Page.
+    import std.Collections.List.
 
-    import std.option.{map, flat_map as bind, Maybe}.
-    import std.option.{Maybe}.
+    import std.Core.Option.{map, flat_map as bind, Maybe}.
+    import std.Core.Option.{Maybe}.
     ```
 *)
 
@@ -211,7 +214,8 @@ ExportItem ::= LowerIdent "/" Int .
 ProtocolDecl ::= [ "pub" ] "protocol" ProtocolName RawBlock .
 ProtocolName ::= NameRef .
 
-ModulePath ::= LowerIdent { "." LowerIdent } .
+ModulePath ::= LowerIdent { "." ModulePathSegment } .
+ModulePathSegment ::= LowerIdent | UpperIdent .
 QualifiedValueRef ::= ModulePath "." LowerIdent .
 ScopedValueRef ::= TypeName "." LowerIdent .
 QualifiedTypeRef ::= ModulePath "." TypeName .
@@ -569,14 +573,14 @@ StringChar ::= ? any source character except unescaped terminator ? .
      blocks. `target erlang { otp_application: true; process_mailbox: enabled }.`
      is syntax only; selected target-profile validation decides whether each
      entry is supported. Config macros are not required in every file. Config
-     values are not Terlang runtime expressions and config symbols are not
+     values are not Terlan runtime expressions and config symbols are not
      runtime atoms.
    - Annotations are structured compiler metadata attached to declarations.
      `@java.annotation Deprecated` and
      `@java.annotation Table { name: "users" }` are target-scoped metadata, not
      runtime expressions. Macros may consume or produce annotations, but
      annotations remain a distinct metadata channel through compiler phases.
-   - Raw pointer syntax is not part of ordinary Terlang source mode. Native
+   - Raw pointer syntax is not part of ordinary Terlan source mode. Native
      memory work is expressed through typed abstractions such as fixed arrays,
      buffers, resources, opaque native handles, and explicit FFI/native
      boundaries. Target backends own pointer lowering after target-profile
@@ -586,7 +590,7 @@ StringChar ::= ? any source character except unescaped terminator ? .
      `{ ... }` before the terminating dot.
    - Source identifiers use two explicit roles:
      `NameRef` for syntactic name positions and `ConstructorAtom` (`UpperIdent`) for
-     constructor-pattern heads. Terlang does not treat bare identifiers as atoms.
+     constructor-pattern heads. Terlan does not treat bare identifiers as atoms.
    - Call expressions are written `Name(...)` and resolved semantically as either
      function calls or constructor calls depending on declaration context.
    - Function-value invocation uses postfix dot-call syntax:
@@ -596,10 +600,10 @@ StringChar ::= ? any source character except unescaped terminator ? .
    - Pipe-to-call and pipe-to-function-value are distinct syntax forms:
      `value |> f(extra)` is call insertion, while `value |> target` lowers through
      function-value invocation as `target.(value)`.
-   - Hard Erlang interop is required, but Terlang source syntax and Erlang
+   - Hard Erlang interop is required, but Terlan source syntax and Erlang
      interop syntax are separate frontends.
    - Erlang interop forms normalize into shared interface/runtime artifacts.
-     They are not required to be accepted unchanged in Terlang source mode.
+     They are not required to be accepted unchanged in Terlan source mode.
    - Raw atom patterns are always allowed and literal-match at runtime:
      `:none`, `:empty`, etc. are pattern literals.
    - Upper-case patterns are constructor-pattern syntax: `None` or `None(...)`.
@@ -609,7 +613,7 @@ StringChar ::= ? any source character except unescaped terminator ? .
      `None()` is not a valid constructor pattern unless the constructor shape
      explicitly requires one-or-more fields.
      Union-style aliases do not imply constructor-pattern syntax in v0.
-   - Erlang variable naming is a backend/interoperability constraint. Terlang
+   - Erlang variable naming is a backend/interoperability constraint. Terlan
      source value bindings remain lower-case; the Erlang backend rewrites
      bindings into valid Erlang variables hygienically.
 *)
