@@ -11,12 +11,12 @@ Declaration ::= { Annotation } DeclarationCore .
 DeclarationCore
   ::= ModuleDecl "." 
    | ImportDecl "."
-   | ExportDecl "."
    | TypeDecl "." 
    | OpaqueTypeDecl "."
    | StructDecl "."
    | ConstructorDecl "."
    | TraitDecl "."
+   | TraitImplDecl "."
    | TemplateDecl "."
    | ConfigDecl "."
    | FunctionDecl "."
@@ -47,7 +47,7 @@ AnnotationArgs ::= MetadataBlock .
    accepted as Terlan source grammar.
 *)
 
-TypeDecl ::= [ "pub" ] "type" TypeName [ TypeParams ] "=" TypeExpr .
+TypeDecl ::= [ "pub" ] "type" TypeName [ TypeParams ] [ ImplementsClause ] "=" TypeExpr .
 
 (* An opaque type declaration defines a nominal type whose representation is known
    inside the defining module and hidden outside it.
@@ -64,7 +64,7 @@ TypeDecl ::= [ "pub" ] "type" TypeName [ TypeParams ] "=" TypeExpr .
    representation. Interface artifacts may therefore omit the representation
    body and declare only the opaque type surface.
 *)
-OpaqueTypeDecl ::= [ "pub" ] "opaque" "type" TypeName [ TypeParams ] [ "=" TypeExpr ] .
+OpaqueTypeDecl ::= [ "pub" ] "opaque" "type" TypeName [ TypeParams ] [ ImplementsClause ] [ "=" TypeExpr ] .
 
 
 (* Struct derivation is compile-time expansion, not true inheritance.
@@ -73,10 +73,34 @@ OpaqueTypeDecl ::= [ "pub" ] "opaque" "type" TypeName [ TypeParams ] [ "=" TypeE
    Derivation does not create subtyping, runtime parent objects, implicit coercions, virtual dispatch, or true inheritance.
    Field conflicts are errors.
    Method conflicts are errors unless an override rule is later introduced.
+
+   Struct visibility and construction authority are separate.
+
+   `pub struct User { ... }` exports the type identity so other modules may
+   name `User` in signatures, fields, and type arguments. It does not export
+   raw struct literal construction.
+
+   `User { ... }` is raw struct construction. It is allowed inside the module
+   that defines `User`, including inside constructor bodies, but it is rejected
+   from other modules unless a future explicit public-data rule is added.
+
+   `pub constructor User { ... }` exports approved constructor-call syntax such
+   as `User(id, name)`. Public constructors are therefore the public
+   construction API for validated, normalized, or capability-checked structs.
+
+   A non-public struct keeps both the type identity and raw construction
+   module-private. A public constructor cannot make an otherwise private return
+   type usable in public signatures; public construction APIs should return
+   public type identities.
   `
     pub struct User {
       id: UserId,
       name: String
+    }.
+
+    pub constructor User {
+      (id: UserId, name: String): User ->
+        User { id = id, name = name }
     }.
 
     pub struct Admin derives User {
@@ -85,12 +109,14 @@ OpaqueTypeDecl ::= [ "pub" ] "opaque" "type" TypeName [ TypeParams ] [ "=" TypeE
   `
 
 *)
-StructDecl ::= [ "pub" ] "struct" TypeName [ StructDerives ] StructBody .
+StructDecl ::= [ "pub" ] "struct" TypeName [ StructDerives ] [ ImplementsClause ] StructBody .
 StructDerives ::= "derives" TypeRef { "," TypeRef } .
+ImplementsClause ::= "implements" TraitRef { "," TraitRef } .
 
 ConstructorDecl ::= [ "pub" ] "constructor" TypeName [ TypeParams ] "{" ConstructorClause { ";" ConstructorClause } "}" .
 FunctionDecl ::= [ "pub" ] [ "macro" ] ( TypedFunction | ClauseFunction ) .
 TraitDecl ::= [ "pub" ] "trait" TypeName [ TypeParams ] [ "extends" TraitRef { "," TraitRef } ] "{" [ TraitMethodDecl { ";" TraitMethodDecl } [ ";" ] ] "}" .
+TraitImplDecl ::= [ "pub" ] "impl" TraitRef "for" TypeExpr "{" [ TraitImplMethod { ";" TraitImplMethod } [ ";" ] ] "}" .
 
 (* A method may only be declared in the module that defines its receiver type.
    Method identity is keyed by receiver type + method name + method arity.
@@ -107,7 +133,7 @@ MethodFunction
 
     A ModulePath begins with a lower-case package segment and may continue with
     lower-case package segments or upper-case public module namespace segments.
-    This supports source paths such as `std.Core.Bool` while keeping package
+    This supports source paths such as `std.core.Bool` while keeping package
     roots lower-case.
 
     A type name is an UpperIdent. A qualified type reference is a ModulePath
@@ -121,17 +147,17 @@ MethodFunction
     grammar preserves the path, and the resolver decides whether a primary type
     exists and is visible.
 
-    The Erlang backend lowers `std.Core.Bool` to the Erlang-safe module atom
+    The Erlang backend lowers `std.core.Bool` to the Erlang-safe module atom
     `std_core_bool`; that mapping is a target artifact decision, not source
     syntax.
 
     ```
-    module app.Web.Page.
+    module app.web.Page.
     module app.user.User.
-    import std.Collections.List.
+    import std.collections.List.
 
-    import std.Core.Option.{map, flat_map as bind, Maybe}.
-    import std.Core.Option.{Maybe}.
+    import std.core.Option.{map, flat_map as bind, Maybe}.
+    import std.core.Option.{Maybe}.
     ```
 *)
 
@@ -179,9 +205,6 @@ AssetImport ::= AssetKind StringLiteral "as" AssetAlias .
 AssetKind ::= "file" | "css" | "markdown" .
 AssetAlias ::= NameRef .
 
-ExportDecl ::= "export" ExportItem { "," ExportItem } .
-ExportItem ::= LowerIdent "/" Int .
-
 ModulePath ::= LowerIdent { "." ModulePathSegment } .
 ModulePathSegment ::= LowerIdent | UpperIdent .
 QualifiedValueRef ::= ModulePath "." LowerIdent .
@@ -215,10 +238,13 @@ ConfigSymbol ::= LowerIdent .
 ConfigList ::= "[" [ ConfigValue { "," ConfigValue } ] "]" .
 ConfigMap ::= "#{" [ ConfigMapEntry { "," ConfigMapEntry } ] "}" .
 ConfigMapEntry ::= ConfigKey ":" ConfigValue .
-(* Raw macro names are user-defined.
+(* Raw macro names are user-defined except for reserved built-in raw forms.
 
    The parser accepts any non-reserved LowerIdent followed immediately by a RawBlock
    as a RawMacroExpr.
+
+   Built-in forms such as `html { ... }` are reserved and parse as dedicated
+   source constructs, not user-defined raw macros.
 
    The parser does not validate whether the raw macro name exists. Macro existence,
    visibility, imports, expansion behavior, and raw-language parsing are resolved
@@ -244,7 +270,8 @@ TypedFunction ::= LowerIdent [ TypeParams ] "(" [ ParamList ] ")" [ ConstraintLi
 ClauseFunction ::= LowerIdent [ TypeParams ] "(" [ PatternList ] ")" [ "when" Expr ] "->" Expr { ";" LowerIdent "(" [ PatternList ] ")" [ "when" Expr ] "->" Expr } .
 PatternList ::= Pattern { "," Pattern } .
 PatternList1 ::= Pattern { "," Pattern } .
-TraitMethodDecl ::= LowerIdent "(" [ ParamList ] ")" ":" TypeExpr .
+TraitMethodDecl ::= LowerIdent [ TypeParams ] "(" [ ParamList ] ")" [ ConstraintList ] ":" TypeExpr [ "->" Expr ] .
+TraitImplMethod ::= LowerIdent [ TypeParams ] "(" [ ParamList ] ")" [ ConstraintList ] ":" TypeExpr "->" Expr .
 TraitRef ::= TypeRef [ TypeArgs ] .
 TypeVar ::= UpperIdent .
 
@@ -313,7 +340,7 @@ AddOp ::= "+" | "-" .
 MulOp ::= "*" | "/" | "div" | "rem" .
 CmpOp ::= "==" | "!=" | ">=" | ">" | "<=" | "<" .
 PostfixExpr ::= PrimaryExpr { PostfixSuffix } .
-PostfixSuffix ::= FieldSuffix | IndexSuffix | FunCallSuffix .
+PostfixSuffix ::= MethodCallSuffix | FieldSuffix | IndexSuffix | FunCallSuffix .
 PrimaryExpr
   ::= AtomLiteral
    | CallExpr
@@ -327,6 +354,7 @@ PrimaryExpr
    | ConsListExpr
    | FixedArrayExpr
    | MapExpr
+   | RecordExpr
    | TemplateInstantiateExpr
    | MacroExpr
    | CaseExpr
@@ -354,10 +382,17 @@ MapField ::= MapExprKey ( "=>" | ":=" ) Expr .
 MapExprKey ::= NameRef .
 TemplateInstantiateExpr ::= TemplateName "{" [ LowerIdent "=" Expr { "," LowerIdent "=" Expr } ] "}" .
 TemplateName ::= NameRef .
+(* RecordExpr is raw struct construction syntax.
+
+   Parsing `TypeName { ... }` does not imply public construction rights.
+   Semantic validation must reject raw struct construction outside the defining
+   module unless a future explicit public-data form grants that capability.
+*)
 RecordExpr ::= TypeName "{" [ LowerIdent "=" Expr { "," LowerIdent "=" Expr } ] "}" .
 ReferenceCallExpr ::= QualifiedCallExpr | ScopedCallExpr .
 QualifiedCallExpr ::= QualifiedValueRef "(" [ ExprList ] ")" .
 ScopedCallExpr ::= ScopedValueRef "(" [ ExprList ] ")" .
+MethodCallSuffix ::= "." LowerIdent "(" [ ExprList ] ")" .
 FieldSuffix ::= "." LowerIdent .
 IndexSuffix ::= "[" Expr "]" .
 FunCallSuffix ::= "." "(" [ ExprList ] ")" .
@@ -397,13 +432,15 @@ RawText ::= ? opaque source text whose unescaped braces are balanced ? .
 ReservedWord
   ::= "module"
    | "import"
-   | "export"
    | "type"
    | "nominal"
    | "opaque"
    | "struct"
    | "constructor"
    | "trait"
+   | "impl"
+   | "implements"
+   | "for"
    | "extends"
    | "where"
    | "template"
