@@ -1,0 +1,3 @@
+-module(phase_binary_mul).
+-export([multiply/2]).
+multiply(X, Y) ->

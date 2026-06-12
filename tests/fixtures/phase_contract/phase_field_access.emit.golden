@@ -1,0 +1,3 @@
+-module(phase_field_access).
+-export([read/1]).
+read(Point) ->

@@ -1,0 +1,3 @@
+-module(phase_literal_pattern_case).
+-export([choose/1]).
+choose(Status) ->

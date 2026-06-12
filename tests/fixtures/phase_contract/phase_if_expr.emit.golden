@@ -1,0 +1,3 @@
+-module(phase_if_expr).
+-export([choose/1]).
+choose(Flag) ->

@@ -1,0 +1,3 @@
+-module(phase_list_literal).
+-export([values/0]).
+values() ->

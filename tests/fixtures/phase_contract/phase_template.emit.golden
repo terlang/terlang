@@ -1,0 +1,3 @@
+-module(phase_template).
+-export([area/1]).
+area(P) ->

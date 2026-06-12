@@ -1,0 +1,121 @@
+{
+  "format_version": 1,
+  "entry_rule": "SyntaxSpec",
+  "rule_count": 176,
+  "key_rules": [
+    {
+      "name": "SyntaxSpec",
+      "id": "rule:SyntaxSpec",
+      "expr_id": "rule:SyntaxSpec/expr",
+      "kind": "nonterminal"
+    },
+    {
+      "name": "Declaration",
+      "id": "rule:Declaration",
+      "expr_id": "rule:Declaration/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "DeclarationCore",
+      "id": "rule:DeclarationCore",
+      "expr_id": "rule:DeclarationCore/expr",
+      "kind": "alternation"
+    },
+    {
+      "name": "Annotation",
+      "id": "rule:Annotation",
+      "expr_id": "rule:Annotation/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "Expr",
+      "id": "rule:Expr",
+      "expr_id": "rule:Expr/expr",
+      "kind": "alternation"
+    },
+    {
+      "name": "SendExpr",
+      "id": "rule:SendExpr",
+      "expr_id": "rule:SendExpr/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "PipeExpr",
+      "id": "rule:PipeExpr",
+      "expr_id": "rule:PipeExpr/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "OrExpr",
+      "id": "rule:OrExpr",
+      "expr_id": "rule:OrExpr/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "AndExpr",
+      "id": "rule:AndExpr",
+      "expr_id": "rule:AndExpr/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "PostfixExpr",
+      "id": "rule:PostfixExpr",
+      "expr_id": "rule:PostfixExpr/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "PrimaryExpr",
+      "id": "rule:PrimaryExpr",
+      "expr_id": "rule:PrimaryExpr/expr",
+      "kind": "alternation"
+    },
+    {
+      "name": "Pattern",
+      "id": "rule:Pattern",
+      "expr_id": "rule:Pattern/expr",
+      "kind": "nonterminal"
+    },
+    {
+      "name": "ListPattern",
+      "id": "rule:ListPattern",
+      "expr_id": "rule:ListPattern/expr",
+      "kind": "alternation"
+    },
+    {
+      "name": "CallExpr",
+      "id": "rule:CallExpr",
+      "expr_id": "rule:CallExpr/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "ScopedCallExpr",
+      "id": "rule:ScopedCallExpr",
+      "expr_id": "rule:ScopedCallExpr/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "RawMacroExpr",
+      "id": "rule:RawMacroExpr",
+      "expr_id": "rule:RawMacroExpr/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "ConfigDecl",
+      "id": "rule:ConfigDecl",
+      "expr_id": "rule:ConfigDecl/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "MetadataBlock",
+      "id": "rule:MetadataBlock",
+      "expr_id": "rule:MetadataBlock/expr",
+      "kind": "sequence"
+    },
+    {
+      "name": "TypeRef",
+      "id": "rule:TypeRef",
+      "expr_id": "rule:TypeRef/expr",
+      "kind": "sequence"
+    }
+  ]
+}

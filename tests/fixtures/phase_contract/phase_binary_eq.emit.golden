@@ -1,0 +1,3 @@
+-module(phase_binary_eq).
+-export([same/2]).
+same(X, Y) ->

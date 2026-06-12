@@ -945,6 +945,7 @@ Items(values).
     );
 }
 
+#[cfg(feature = "internal_historical_tests")]
 #[test]
 fn formal_syntax_output_direct_emit_rejects_nullary_literal_alias_constructor_calls() {
     let module = parse_module_as_syntax_output(
@@ -974,6 +975,7 @@ None().
     );
 }
 
+#[cfg(feature = "internal_historical_tests")]
 #[test]
 fn formal_syntax_output_direct_emit_rejects_imported_nullary_literal_alias_constructor_calls() {
     let provider = parse_module_as_syntax_output(

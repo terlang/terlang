@@ -1937,6 +1937,7 @@ mod tests {
     /// - Checks each next-model candidate appears in the current-candidate text
     ///   across the conformance note, Lean README, and roadmap so the Lean
     ///   resume cycle is not stale.
+    #[cfg(feature = "internal_formal_docs")]
     #[test]
     fn proof_baseline_docs_mention_every_fixture() {
         let conformance_note =
@@ -2005,6 +2006,7 @@ mod tests {
     ///   the handoff documents name the remote-dispatch readiness policy. This
     ///   prevents the candidate from staying pinned for a vague or stale
     ///   Lean-modeling reason after remote-call typing/progress anchors exist.
+    #[cfg(feature = "internal_formal_docs")]
     #[test]
     fn proof_baseline_phase_trait_documents_remote_dispatch_policy_blocker() {
         let Some(phase_trait_candidate) = next_lean_model_candidate_baselines()

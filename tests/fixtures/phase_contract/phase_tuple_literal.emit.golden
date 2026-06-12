@@ -1,0 +1,3 @@
+-module(phase_tuple_literal).
+-export([pair/0]).
+pair() ->
