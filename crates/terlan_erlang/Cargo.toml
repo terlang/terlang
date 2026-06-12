@@ -3,6 +3,9 @@ name = "terlan_erlang"
 version = "0.0.1"
 edition = "2021"
 
+[features]
+internal_historical_tests = []
+
 [dependencies]
 terlan_hir = { path = "../terlan_hir" }
 terlan_html = { path = "../terlan_html" }
