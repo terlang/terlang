@@ -1,6 +1,6 @@
 # Terlan
 
-## Write once. Compile everywhere.
+### Write once. Compile everywhere.
 
 Terlan is an open source, statically typed, functional programming language for
 building safe, predictable, industrial-strength software across server, native,
@@ -10,7 +10,32 @@ through explicit compiler targets.
 
 Terlan favors immutable data, explicit types, and predictable control flow,
 while remaining practical for object-style APIs, platform interop, and rich
-domain modeling.
+domain modeling. If you have worked in the industry across multiple server stacks, everything about Terlan should familiar and intuitive.
+
+## Hello World
+
+The value proposition of Terlan is best demonstrated in the following example: 
+
+```terlan
+module hello_terl.Main.
+
+import std.io.Console.{println}.
+import std.core.Bool.
+
+pub main(): Unit ->
+    println("Hello Terl").
+```
+
+This compiles to Erlang:
+
+```erlang
+-module(hello_terl_main).
+
+-export([main/0]).
+
+main() ->
+    begin io:format("~ts~n", ["Hello Terl"]), unit end.
+```
 
 ## Status
 
