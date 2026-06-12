@@ -28,6 +28,9 @@ on:
       - "Makefile"
       - ".github/workflows/ci.yml"
 
+permissions:
+  contents: read
+
 jobs:
   check:
     name: Compiler check and test
